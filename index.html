@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MFD Portfolio Analyser</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:    #0D1B2A;
+      --navy-mid:#1A2E45;
+      --gold:    #C9A84C;
+      --gold-lt: #F5EDD3;
+      --slate:   #4A5568;
+      --slate-lt:#F7F8FA;
+      --border:  #E2E6ED;
+      --text:    #1A202C;
+      --muted:   #718096;
+      --green:   #276749;
+      --green-bg:#EBF5EE;
+      --amber:   #B7791F;
+      --amber-bg:#FEFCE8;
+      --red:     #9B2335;
+      --red-bg:  #FEF2F2;
+      --white:   #FFFFFF;
+      --radius:  8px;
+      --shadow:  0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--slate-lt);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--white);
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -.01em;
+    }
+    .logo svg { opacity: .9; }
+    .logo-tag {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--gold);
+      background: rgba(201,168,76,.12);
+      border: 1px solid rgba(201,168,76,.25);
+      padding: 2px 8px;
+      border-radius: 20px;
+      letter-spacing: .04em;
+    }
+    .header-meta {
+      font-size: 11px;
+      color: rgba(255,255,255,.45);
+    }
+
+    /* ── Layout ── */
+    .page {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* ── Step layout ── */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .step-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .step-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+    }
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--navy);
+      color: var(--white);
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .step-sub   { font-size: 12px; color: var(--muted); margin-top: 1px; }
+    .step-body  { padding: 18px 20px; }
+
+    /* ── Upload zone ── */
+    .upload-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      background: var(--slate-lt);
+    }
+    .upload-zone:hover, .upload-zone.drag {
+      border-color: var(--navy);
+      background: #EDF2F7;
+    }
+    .upload-zone input { display: none; }
+    .uz-icon { font-size: 32px; margin-bottom: 8px; }
+    .uz-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .uz-hint  { font-size: 12px; color: var(--muted); }
+
+    .file-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .file-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px 4px 8px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      color: var(--slate);
+    }
+    .file-chip .rm {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1;
+      margin-left: 2px;
+      transition: color .1s;
+    }
+    .file-chip .rm:hover { color: var(--red); }
+    .chip-icon { font-size: 14px; }
+
+    /* ── Form fields ── */
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 12px; font-weight: 600; color: var(--slate); letter-spacing: .02em; }
+    input[type=text], input[type=date], select {
+      height: 38px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0 12px;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      background: var(--white);
+      transition: border-color .15s;
+      width: 100%;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--navy); }
+
+    /* ── Section toggles ── */
+    .section-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+    .sec-toggle {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: border-color .12s, background .12s;
+      background: var(--white);
+      user-select: none;
+    }
+    .sec-toggle:hover { border-color: var(--navy); background: var(--slate-lt); }
+    .sec-toggle.on { border-color: var(--navy); background: #EDF2F7; }
+    .sec-toggle.on .st-check { opacity: 1; }
+    .st-row { display: flex; align-items: center; justify-content: space-between; }
+    .st-label { font-size: 12px; font-weight: 600; color: var(--text); }
+    .st-check { width: 16px; height: 16px; border-radius: 50%; background: var(--navy); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .12s; flex-shrink: 0; }
+    .st-check svg { width: 9px; height: 9px; stroke: white; stroke-width: 2.5; fill: none; }
+    .st-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* ── Run button ── */
+    .run-btn {
+      width: 100%;
+      height: 44px;
+      background: var(--navy);
+      color: var(--white);
+      border: none;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background .15s;
+    }
+    .run-btn:hover:not(:disabled) { background: var(--navy-mid); }
+    .run-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* ── Progress ── */
+    .progress-wrap { margin-top: 12px; }
+    .progress-bar {
+      height: 3px;
+      border-radius: 2px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--gold);
+      border-radius: 2px;
+      transition: width .5s ease;
+      width: 0%;
+    }
+    .progress-label { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+    /* ── Log ── */
+    .log-box {
+      margin-top: 12px;
+      background: var(--navy);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: rgba(255,255,255,.55);
+      max-height: 160px;
+      overflow-y: auto;
+      line-height: 1.8;
+    }
+    .log-box .ok   { color: #68D391; }
+    .log-box .warn { color: #F6E05E; }
+    .log-box .err  { color: #FC8181; }
+
+    /* ── Result ── */
+    .result-card {
+      background: var(--white);
+      border: 1.5px solid #276749;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+      margin-top: 1.25rem;
+    }
+    .result-head {
+      background: var(--green-bg);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #C6E6D1;
+    }
+    .result-title { font-size: 14px; font-weight: 600; color: var(--green); flex: 1; }
+    .result-body { padding: 16px 18px; }
+
+    .traffic-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+    .traffic-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .traffic-dot.green  { background: #38A169; }
+    .traffic-dot.amber  { background: #D69E2E; }
+    .traffic-dot.red    { background: #E53E3E; }
+    .traffic-investor { font-size: 12px; font-weight: 600; color: var(--text); min-width: 60px; }
+    .traffic-verdict  { font-size: 12px; color: var(--muted); flex: 1; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .summary-stat {
+      background: var(--slate-lt);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .ss-val   { font-size: 22px; font-weight: 600; color: var(--text); }
+    .ss-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .dl-btn {
+      width: 100%;
+      height: 42px;
+      background: var(--white);
+      color: var(--navy);
+      border: 1.5px solid var(--navy);
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background .12s, color .12s;
+      margin-top: 14px;
+    }
+    .dl-btn:hover { background: var(--navy); color: var(--white); }
+
+    /* ── Info callout ── */
+    .callout {
+      background: var(--gold-lt);
+      border: 1px solid #E6D08A;
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      font-size: 12px;
+      color: #744210;
+      line-height: 1.6;
+      margin-top: 12px;
+    }
+    .callout strong { font-weight: 600; }
+
+    /* ── How it works footer ── */
+    .how-section {
+      margin-top: 2rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1.5rem;
+    }
+    .how-title { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 12px; }
+    .how-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .how-step { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+    .hs-n { font-size: 11px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+    .hs-t { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .hs-d { font-size: 11px; color: var(--muted); line-height: 1.5; }
+    code { font-family: 'IBM Plex Mono', monospace; font-size: 10px; background: #EDF2F7; color: var(--navy); padding: 1px 5px; border-radius: 3px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .field-row { grid-template-columns: 1fr; }
+      .section-grid { grid-template-columns: 1fr 1fr; }
+      .how-grid { grid-template-columns: 1fr 1fr; }
+      .summary-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <rect x="1" y="1" width="20" height="20" rx="4" stroke="#C9A84C" stroke-width="1.5"/>
+      <path d="M6 15L9 9L12 13L15 7" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    MFD Portfolio Analyser
+    <span class="logo-tag">ARN REGISTERED</span>
+  </div>
+  <div class="header-meta">Powered by Claude AI &nbsp;·&nbsp; Data stays on your device &nbsp;·&nbsp; <span id="build-marker" style="opacity:.6">build 2026-06-30-v6</span></div>
+</header>
+
+<div class="page">
+  <div class="steps">
+
+    <!-- Step 1: Upload -->
+    <div class="step-card">
+      <div class="step-head">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Upload holding file(s)</div>
+          <div class="step-sub">Portfolio valuation statements, AMC holding exports</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <div class="upload-zone" id="drop-zone"
+          onclick="document.getElementById('file-input').click()"
+          ondragover="onDrag(event,'drag')" ondragleave="onDrag(event,'')" ondrop="onDrop(event)">
+          <input type="file" id="file-input" multiple accept=".xlsx,.xls,.csv,.pdf,.txt" onchange="addFiles(this.files)" />
+          <div class="uz-icon">📂</div>
+          <div class="uz-title">Drop files here or click to browse</div>
+          <div class="uz-hint">.xlsx · .xls · .csv · .pdf · .txt &nbsp;— portfolio valuation or holding statements</div>
+        </div>
+        <div class="file-chips" id="file-chips"></div>
+        <div class="callout" style="margin-top:12px">
+          <strong>Privacy:</strong> Your files are read entirely in your browser. They are sent only to the Anthropic Claude API for analysis and are never stored on any server. The generated Excel is built and downloaded locally.
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Client details -->
+    <div class="step-card">
+      <div class="step-head">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Client details</div>
+          <div class="step-sub">Used in the workbook cover page and filename</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <div class="field-row">
+          <div class="field">
+            <label>Client / family name</label>
+            <input type="text" id="client-name" placeholder="e.g. MDG Family" />
+          </div>
+          <div class="field">
+            <label>ARN holder name</label>
+            <input type="text" id="arn-name" placeholder="e.g. Anand Gondal" />
+          </div>
+          <div class="field">
+            <label>Review date</label>
+            <input type="date" id="review-date" />
+          </div>
+          <div class="field">
+            <label>Data reference date</label>
+            <input type="date" id="ref-date" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Sections -->
+    <div class="step-card">
+      <div class="step-head">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Sections to include</div>
+          <div class="step-sub">All selected by default — click to deselect</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <div class="section-grid" id="sec-grid">
+          <div class="sec-toggle on" data-sec="A" onclick="toggleSec(this)">
+            <div class="st-row">
+              <div class="st-label">A — Health snapshot</div>
+              <div class="st-check"><svg viewBox="0 0 10 8"><polyline points="1,4 4,7 9,1"/></svg></div>
+            </div>
+            <div class="st-desc">Traffic-light verdict per investor</div>
+          </div>
+          <div class="sec-toggle on" data-sec="B" onclick="toggleSec(this)">
+            <div class="st-row">
+              <div class="st-label">B — Allocation drift</div>
+              <div class="st-check"><svg viewBox="0 0 10 8"><polyline points="1,4 4,7 9,1"/></svg></div>
+            </div>
+            <div class="st-desc">Equity / debt / hybrid split vs target</div>
+          </div>
+          <div class="sec-toggle on" data-sec="C" onclick="toggleSec(this)">
+            <div class="st-row">
+              <div class="st-label">C — Findings</div>
+              <div class="st-check"><svg viewBox="0 0 10 8"><polyline points="1,4 4,7 9,1"/></svg></div>
+            </div>
+            <div class="st-desc">Rolling returns, overlap, concentration, tax</div>
+          </div>
+          <div class="sec-toggle on" data-sec="D" onclick="toggleSec(this)">
+            <div class="st-row">
+              <div class="st-label">D — Action list</div>
+              <div class="st-check"><svg viewBox="0 0 10 8"><polyline points="1,4 4,7 9,1"/></svg></div>
+            </div>
+            <div class="st-desc">MUST / SHOULD / CONSIDER with rationale</div>
+          </div>
+          <div class="sec-toggle on" data-sec="E" onclick="toggleSec(this)">
+            <div class="st-row">
+              <div class="st-label">E — Next review</div>
+              <div class="st-check"><svg viewBox="0 0 10 8"><polyline points="1,4 4,7 9,1"/></svg></div>
+            </div>
+            <div class="st-desc">Agenda items for next meeting</div>
+          </div>
+          <div class="sec-toggle on" data-sec="disc" onclick="toggleSec(this)">
+            <div class="st-row">
+              <div class="st-label">Disclaimer block</div>
+              <div class="st-check"><svg viewBox="0 0 10 8"><polyline points="1,4 4,7 9,1"/></svg></div>
+            </div>
+            <div class="st-desc">Mandatory regulatory disclaimer</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Run -->
+    <div class="step-card">
+      <div class="step-head">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-title">Generate workbook</div>
+          <div class="step-sub">Claude analyses the file and builds the Excel report</div>
+        </div>
+      </div>
+      <div class="step-body">
+        <button class="run-btn" id="run-btn" onclick="runAnalysis()" disabled>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 1L10 6H15L11 9.5L12.5 15L8 12L3.5 15L5 9.5L1 6H6L8 1Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          </svg>
+          Analyse portfolio and generate Excel
+        </button>
+
+        <div class="progress-wrap" id="prog-wrap" style="display:none">
+          <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
+          <div class="progress-label" id="prog-label">Initialising…</div>
+        </div>
+
+        <div class="log-box" id="log-box" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="result-card" id="result-card" style="display:none">
+      <div class="result-head">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M7 10L9.5 12.5L13 8" stroke="#276749" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="10" cy="10" r="8.5" stroke="#276749" stroke-width="1.3"/>
+        </svg>
+        <div class="result-title">Analysis complete</div>
+        <span id="result-tl" style="font-size:13px;font-weight:600"></span>
+      </div>
+      <div class="result-body">
+        <div class="summary-grid" id="summary-grid"></div>
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Health snapshot per investor</div>
+        <div id="traffic-lights"></div>
+        <button class="dl-btn" onclick="downloadExcel()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 13H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Download Excel workbook
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /steps -->
+
+  <!-- How it works -->
+  <div class="how-section">
+    <div class="how-title">How it works</div>
+    <div class="how-grid">
+      <div class="how-step">
+        <div class="hs-n">01</div>
+        <div class="hs-t">File reading</div>
+        <div class="hs-d"><code>FileReader</code> converts your .xlsx / .pdf to base64 in-browser. Nothing touches a server until the API call.</div>
+      </div>
+      <div class="how-step">
+        <div class="hs-n">02</div>
+        <div class="hs-t">Claude analyses</div>
+        <div class="hs-d">Your file + full MFD system prompt sent to <code>claude-sonnet-4-6</code>. Rolling returns, tax, overlap, actions all analysed.</div>
+      </div>
+      <div class="how-step">
+        <div class="hs-n">03</div>
+        <div class="hs-t">Structured JSON</div>
+        <div class="hs-d">Claude returns a clean JSON object with all six sections. The app validates and maps it to the workbook schema.</div>
+      </div>
+      <div class="how-step">
+        <div class="hs-n">04</div>
+        <div class="hs-t">Excel export</div>
+        <div class="hs-d"><code>SheetJS</code> writes a multi-sheet .xlsx with colour-coded sections. Browser download — no upload needed.</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+/* ── State ── */
+let uploadedFiles = [];
+let analysisResult = null;
+
+/* ── Note ──
+   The MFD system prompt and JSON schema live ONLY in server.py and
+   are never duplicated here. The browser never talks to the Claude
+   API directly — it only ever calls this server's own /api/analyse
+   route, which holds the real prompt, the real schema, and the API
+   key. Editing prompt text here would have had zero effect; a
+   previous version of this file kept a stale copy for reference,
+   which has been removed to avoid that confusion. */
+
+/* ── File handling ── */
+function onDrag(e, cls) {
+  e.preventDefault();
+  document.getElementById('drop-zone').className = 'upload-zone' + (cls ? ' ' + cls : '');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').className = 'upload-zone';
+  addFiles(e.dataTransfer.files);
+}
+function addFiles(list) {
+  for (const f of list) {
+    if (!uploadedFiles.find(x => x.name === f.name)) uploadedFiles.push(f);
+  }
+  renderChips();
+  updateBtn();
+}
+function removeFile(i) {
+  uploadedFiles.splice(i, 1);
+  renderChips();
+  updateBtn();
+}
+function renderChips() {
+  const el = document.getElementById('file-chips');
+  el.innerHTML = uploadedFiles.map((f, i) => {
+    const ext = f.name.split('.').pop().toUpperCase();
+    const icon = ext === 'PDF' ? '📄' : '📊';
+    return `<div class="file-chip"><span class="chip-icon">${icon}</span>${esc(f.name)}<span class="rm" onclick="removeFile(${i})" title="Remove">×</span></div>`;
+  }).join('');
+}
+
+/* ── Section toggles ── */
+function toggleSec(el) { el.classList.toggle('on'); }
+
+/* ── Run button ── */
+function updateBtn() {
+  document.getElementById('run-btn').disabled = uploadedFiles.length === 0;
+}
+
+/* ── Logging ── */
+function log(msg, cls) {
+  const box = document.getElementById('log-box');
+  box.style.display = 'block';
+  const line = document.createElement('div');
+  line.className = cls || '';
+  line.textContent = '› ' + msg;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+function setProgress(pct, label) {
+  document.getElementById('prog-fill').style.width = pct + '%';
+  if (label) document.getElementById('prog-label').textContent = label;
+}
+
+/* ── Main analysis ── */
+async function runAnalysis() {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('log-box').innerHTML = '';
+  document.getElementById('prog-wrap').style.display = 'block';
+  document.getElementById('log-box').style.display = 'none';
+  analysisResult = null;
+
+  const clientName = document.getElementById('client-name').value.trim() || 'Portfolio Review';
+  const arnName    = document.getElementById('arn-name').value.trim() || '';
+  const reviewDate = document.getElementById('review-date').value || new Date().toISOString().slice(0, 10);
+  const refDate    = document.getElementById('ref-date').value || '';
+
+  try {
+    setProgress(8, 'Preparing files…');
+    log('Preparing files for upload…');
+
+    /*
+      Files are sent as real multipart/form-data — NOT base64 JSON.
+      The Claude API's `document` content block only accepts
+      application/pdf. Excel/CSV files have to be converted to plain
+      text before they reach Claude, and that conversion happens on
+      the server (it needs pandas/openpyxl). So the browser's only
+      job here is to hand over the raw files untouched.
+    */
+    const formData = new FormData();
+    for (const file of uploadedFiles) {
+      log('Adding: ' + file.name);
+      formData.append('files', file, file.name);
+    }
+
+    const metaText = [
+      'Client / family name: ' + clientName,
+      'ARN holder: ' + (arnName || 'Not specified'),
+      'Review date: ' + reviewDate,
+      'Data reference date: ' + (refDate || 'Last working day of prior month'),
+      '',
+      'Please analyse all uploaded portfolio files and return the full JSON review as specified.'
+    ].join('\n');
+    formData.append('meta', metaText);
+
+    setProgress(25, 'Sending to server…');
+    log('Calling Claude API…');
+
+    const resp = await fetch('/api/analyse', {
+      method: 'POST',
+      body: formData
+      /* No Content-Type header — the browser sets the correct
+         multipart boundary automatically. Setting it manually here
+         is a common mistake that breaks the upload. */
+    });
+
+    setProgress(65, 'Claude is analysing your portfolio…');
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `Server error ${resp.status}`);
+    }
+
+    const data = await resp.json();
+
+    // Server explicitly flags any failure to produce a usable result
+    // (cut off, refused, or — even with structured outputs — failed
+    // to parse) rather than letting the frontend guess at why.
+    if (data.truncated) {
+      throw new Error(data.error || 'Response could not be completed. Please try again.');
+    }
+
+    // The server already parsed and validated this with Python's
+    // real json module (see /api/analyse in server.py) — data.review
+    // is a plain JS object here, not a string. No regex extraction,
+    // no JSON.parse, no guessing where the JSON starts and ends.
+    // This is the entire fix for the "Expected ',' or ']'" class of
+    // error: that class of bug can only happen when something tries
+    // to parse JSON text after the fact. Once the server hands over
+    // an already-parsed object, there is nothing left for the
+    // browser to get wrong.
+    if (!data.review) {
+      throw new Error('Server did not return a review object. Please try again.');
+    }
+
+    analysisResult = data.review;
+    log('Response received and parsed server-side.', 'ok');
+    setProgress(85, 'Building result preview…');
+
+    analysisResult.client     = clientName;
+    analysisResult.arnHolder  = arnName;
+    analysisResult.reviewDate = reviewDate;
+    analysisResult.refDate    = refDate;
+
+    setProgress(95, 'Building result preview…');
+    log('Analysis complete.', 'ok');
+
+    renderResult(analysisResult);
+    setProgress(100, 'Done.');
+
+  } catch (e) {
+    log('Error: ' + e.message, 'err');
+    setProgress(0, 'Failed — see log above');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ── Render result preview ── */
+function tl(s) { return s === 'GREEN' ? 'green' : s === 'AMBER' ? 'amber' : 'red'; }
+function tlLabel(s) { return s === 'GREEN' ? '🟢 Green' : s === 'AMBER' ? '🟡 Amber' : '🔴 Red'; }
+
+function renderResult(r) {
+  document.getElementById('result-card').style.display = 'block';
+  document.getElementById('result-tl').textContent = tlLabel(r.sectionA?.trafficLight);
+
+  const actions  = r.sectionD?.actions || [];
+  const funds    = r.sectionC?.rollingReturns || [];
+  const mustN    = actions.filter(a => a.priority === 'MUST').length;
+
+  document.getElementById('summary-grid').innerHTML = [
+    { val: funds.length,                          label: 'Funds analysed' },
+    { val: mustN + ' MUST / ' + actions.filter(a => a.priority === 'SHOULD').length + ' SHOULD', label: 'Priority actions' },
+    { val: (r.sectionC?.tax || []).length,        label: 'Tax observations' },
+  ].map(s => `<div class="summary-stat"><div class="ss-val">${s.val}</div><div class="ss-label">${s.label}</div></div>`).join('');
+
+  const tls = document.getElementById('traffic-lights');
+  tls.innerHTML = (r.sectionA?.investors || []).map(inv =>
+    `<div class="traffic-row">
+      <div class="traffic-dot ${tl(inv.status)}"></div>
+      <div class="traffic-investor">${esc(inv.name)}</div>
+      <div class="traffic-verdict">${esc(inv.verdict)}</div>
+    </div>`
+  ).join('');
+
+  document.getElementById('result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ── Excel download ── */
+function downloadExcel() {
+  if (!analysisResult) return;
+  const r = analysisResult;
+  const wb = XLSX.utils.book_new();
+
+  /* helper */
+  const addSheet = (name, rows) => {
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = rows[0]?.map(() => ({ wch: 28 })) || [];
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  };
+
+  /* Cover */
+  addSheet('Cover', [
+    ['PORTFOLIO REVIEW WORKBOOK'],
+    [],
+    ['Client / Family', r.client || ''],
+    ['ARN Holder',      r.arnHolder || ''],
+    ['Review Date',     r.reviewDate || ''],
+    ['Data Reference',  r.refDate || 'Last working day of prior month'],
+    ['Data Source',     r.dataSource || 'Uploaded portfolio holding file'],
+    ['Generated',       new Date().toLocaleString('en-IN')],
+    [],
+    ['Overall Health',  r.sectionA?.trafficLight || ''],
+    ['Verdict',         r.sectionA?.overallVerdict || ''],
+  ]);
+
+  /* Section A */
+  const aRows = [
+    ['SECTION A — HEALTH SNAPSHOT'],
+    [],
+    ['Investor', 'Verdict', 'Status'],
+  ];
+  for (const inv of (r.sectionA?.investors || [])) {
+    aRows.push([inv.name, inv.verdict, inv.status]);
+  }
+  addSheet('A - Health Snapshot', aRows);
+
+  /* Section B */
+  const bRows = [
+    ['SECTION B — ALLOCATION DRIFT'],
+    [],
+    ['Investor', 'Equity %', 'Hybrid %', 'Debt %', 'Gold %', 'Other %', 'Total Value (INR)', 'Note', 'Status'],
+  ];
+  for (const al of (r.sectionB?.allocation || [])) {
+    bRows.push([al.investor, al.equity, al.hybrid, al.debt, al.gold || 0, al.other || 0, al.totalValue, al.note, al.status]);
+  }
+  addSheet('B - Allocation', bRows);
+
+  /* Section C */
+  const cRows = [['SECTION C — FINDINGS'], []];
+  cRows.push(['CONCENTRATION FLAGS']);
+  for (const c of (r.sectionC?.concentration || [])) cRows.push(['• ' + c]);
+  cRows.push([], ['ROLLING RETURNS VS BENCHMARK'],
+    ['Fund', 'Inception Date', 'Style Box', '3Y Fund %', '3Y Bench %', '3Y Verdict', '5Y Fund %', '5Y Bench %', '5Y Verdict', '10Y Fund %', '10Y Bench %', '10Y Verdict', 'Benchmark Index', 'Data Gap Note']
+  );
+  for (const f of (r.sectionC?.rollingReturns || [])) {
+    const hasGap = !!(f.dataGap && f.dataGap.trim());
+    cRows.push([
+      f.fund, f.inception, f.styleBox || '',
+      hasGap ? 'N/A' : f.returnFund3y, hasGap ? 'N/A' : f.returnBench3y, f.verdict3y,
+      hasGap ? 'N/A' : f.returnFund5y, hasGap ? 'N/A' : f.returnBench5y, f.verdict5y,
+      hasGap ? 'N/A' : f.returnFund10y, hasGap ? 'N/A' : f.returnBench10y, f.verdict10y,
+      f.benchmark, f.dataGap || ''
+    ]);
+  }
+  cRows.push([], ['FUND OVERLAP & CATEGORY SPRAWL']);
+  for (const o of (r.sectionC?.overlap || [])) cRows.push(['• ' + o]);
+  cRows.push([], ['TAX EFFICIENCY OBSERVATIONS']);
+  for (const t of (r.sectionC?.tax || [])) cRows.push(['• ' + t]);
+  addSheet('C - Findings', cRows);
+
+  /* Section D */
+  const dRows = [
+    ['SECTION D — PRIORITISED ACTION LIST'],
+    [],
+    ['#', 'Priority', 'Investor', 'Action', 'Rationale'],
+  ];
+  (r.sectionD?.actions || []).forEach((a, i) => {
+    dRows.push([i + 1, a.priority, a.investor, a.action, a.rationale]);
+  });
+  addSheet('D - Actions', dRows);
+
+  /* Section E */
+  const eRows = [['SECTION E — NEXT REVIEW AGENDA'], []];
+  (r.sectionE?.agenda || []).forEach((item, i) => eRows.push([i + 1, item]));
+  addSheet('E - Next Review', eRows);
+
+  /* Disclaimer */
+  addSheet('Disclaimer', [
+    ['DISCLAIMER'],
+    [],
+    [r.disclaimer || ''],
+  ]);
+
+  const safe = (r.client || 'Portfolio').replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '');
+  const dateStr = (r.reviewDate || '').replace(/-/g, '');
+  XLSX.writeFile(wb, `${safe}_PortfolioReview_${dateStr}.xlsx`);
+}
+
+/* ── Utils ── */
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/* ── Init ── */
+document.getElementById('review-date').value = new Date().toISOString().slice(0, 10);
+const lastMonth = new Date();
+lastMonth.setMonth(lastMonth.getMonth() - 1);
+lastMonth.setDate(new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0).getDate());
+document.getElementById('ref-date').value = lastMonth.toISOString().slice(0, 10);
+
+/* ── bfcache guard ──
+   The browser's back/forward cache (bfcache) can restore a frozen,
+   already-executed copy of this exact page — including whatever
+   JavaScript was running at the time — when navigating back/forward,
+   completely bypassing the network and any Cache-Control headers.
+   If this page is ever restored from bfcache (event.persisted is
+   true), that means stale JS could still be active even after a
+   server-side redeploy. Force a real reload from the network in
+   that case so an old cached version can never silently resurface. */
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
+</script>
+</body>
+</html>
